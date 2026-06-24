@@ -1,26 +1,76 @@
-@import "tailwindcss";
+/* Pretendard — closest public equivalent to Toss Product Sans */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Toss Design Tokens ─────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg:            #ffffff;
+  --bg-alt:        #f9fafb;
+  --surface:       #f2f4f6;
+  --surface-2:     #e8f3ff;
+
+  --text:          #191f28;
+  --text-secondary:#333d4b;
+  --text-muted:    #6b7684;
+  --text-dim:      #8b95a1;
+
+  --border:        #e5e8eb;
+  --border-strong: #d1d6db;
+
+  --accent:        #3182f6;
+  --accent-hover:  #1b64da;
+  --accent-deep:   #1e40af;
+  --accent-soft:   #e8f3ff;
+
+  --success:       #00c896;
+  --warning:       #ff9500;
+  --danger:        #f04452;
+
+  --radius-btn:    7px;
+  --radius-card:   12px;
+  --shadow-card:   0 1px 3px rgba(25, 31, 40, 0.04);
+  --shadow-modal:  0 8px 24px rgba(25, 31, 40, 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base resets ────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
+  font-variant-numeric: tabular-nums; /* all numerals tabular by default */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Pretendard Variable', 'Pretendard', -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* ── Monetary values — always tabular ───────────────────── */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ── Tap press feedback (96ms) ──────────────────────────── */
+.pressable {
+  transition: transform 96ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.98);
+}
+
+/* ── Scrollbar thin ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
