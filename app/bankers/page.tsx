@@ -1,10 +1,11 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-server'
 import type { Banker } from '@/lib/supabase'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
 
 export default async function BankersPage() {
+  const supabase = await createClient()
   const [{ data: bankers, error }, { data: txnData }] = await Promise.all([
     supabase.from('bankers').select('*').order('full_name'),
     supabase.from('transactions').select('banker_id, amount, type'),

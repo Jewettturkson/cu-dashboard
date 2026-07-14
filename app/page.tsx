@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-server'
 import { Users, Banknote, TrendingUp, UserCheck } from 'lucide-react'
 import LogDepositButton from '@/components/LogDepositButton'
 
@@ -15,6 +15,7 @@ const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' })
 
 export default async function DashboardPage() {
+  const supabase = await createClient()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)

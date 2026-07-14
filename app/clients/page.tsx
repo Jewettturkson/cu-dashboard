@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-server'
 import type { Client } from '@/lib/supabase'
 import { Wifi, WifiOff } from 'lucide-react'
 import AddClientButton from '@/components/AddClientButton'
@@ -10,6 +10,7 @@ const formatGHS = (n: number) =>
   `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 export default async function ClientsPage() {
+  const supabase = await createClient()
   const { data: clients, error } = await supabase
     .from('clients')
     .select('*, accounts(balance)')

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-server'
 import type { Transaction } from '@/lib/supabase'
 import LogDepositButton from '@/components/LogDepositButton'
 
@@ -15,6 +15,7 @@ const formatDateTime = (d: string) => {
 }
 
 export default async function TransactionsPage() {
+  const supabase = await createClient()
   const { data: transactions, error } = await supabase
     .from('transactions')
     .select('*, clients(full_name, account_number), bankers(full_name)')

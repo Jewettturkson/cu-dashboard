@@ -16,8 +16,8 @@ export default function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
 
-  // Don't render on login page
-  if (pathname === '/login') return null
+  // Don't render on login page or the banker collect screen
+  if (pathname === '/login' || pathname === '/collect') return null
 
   const handleLogout = async () => {
     const supabase = createClient()

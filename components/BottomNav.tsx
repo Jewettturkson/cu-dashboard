@@ -17,8 +17,8 @@ export default function BottomNav() {
   const pathname = usePathname()
   const [depositOpen, setDepositOpen] = useState(false)
 
-  // Don't render on login page
-  if (pathname === '/login') return null
+  // Don't render on login page or the banker collect screen
+  if (pathname === '/login' || pathname === '/collect') return null
 
   return (
     <>

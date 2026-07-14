@@ -1,0 +1,258 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase-browser'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Banknote, Wifi, CheckCircle, LogOut, Search } from 'lucide-react'
+
+const supabase = createClient()
+
+type ClientRow = { id: string; full_name: string; account_number: string | null }
+
+type Props = {
+  clients: ClientRow[]
+  bankerId: string | null
+  bankerName: string
+  isAdmin: boolean
+}
+
+// One screen, one action: pick client → amount → confirm.
+// Designed for low digital literacy: big targets, color + icon
+// feedback, no navigation.
+export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: Props) {
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<ClientRow | null>(null)
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState<'cash' | 'momo'>('cash')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState<{ client: string; amount: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return clients
+    return clients.filter(
+      c =>
+        c.full_name.toLowerCase().includes(q) ||
+        (c.account_number ?? '').toLowerCase().includes(q)
+    )
+  }, [clients, query])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const handleSubmit = async () => {
+    if (!selected || !amount) return
+    setLoading(true)
+    setError(null)
+
+    const { error } = await supabase.from('transactions').insert({
+      client_id: selected.id,
+      banker_id: bankerId,
+      amount: parseFloat(amount),
+      type: 'deposit',
+      method,
+    })
+
+    setLoading(false)
+    if (error) { setError(error.message); return }
+
+    setSuccess({ client: selected.full_name, amount })
+  }
+
+  const reset = () => {
+    setSuccess(null)
+    setSelected(null)
+    setAmount('')
+    setMethod('cash')
+    setQuery('')
+  }
+
+  /* ── Success screen: unmissable confirmation ── */
+  if (success) {
+    return (
+      <div style={{ padding: '64px 20px', textAlign: 'center' }}>
+        <CheckCircle size={72} style={{ color: 'var(--success)', margin: '0 auto 16px' }} />
+        <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 22 }}>Deposit recorded</p>
+        <p style={{ color: 'var(--text)', fontSize: 17, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
+          GH₵ {Number(success.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>{success.client}</p>
+        <button
+          onClick={reset}
+          className="pressable"
+          style={{
+            marginTop: 32, width: '100%', padding: '16px 20px',
+            background: 'var(--accent)', color: '#f9fafb',
+            border: 'none', borderRadius: 'var(--radius-btn)',
+            fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Log another deposit
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 20 }}>Collect</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>{bankerName}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isAdmin && (
+            <Link href="/" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+              Dashboard
+            </Link>
+          )}
+          <button
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            style={{ background: 'var(--surface)', border: 'none', borderRadius: 'var(--radius-btn)', padding: 10, cursor: 'pointer', color: 'var(--text-muted)' }}
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Step 1: pick client */}
+      {!selected ? (
+        <>
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+            <input
+              type="text"
+              placeholder="Search name or account…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              style={{
+                width: '100%', background: 'var(--surface)', border: 'none',
+                borderRadius: 'var(--radius-card)', padding: '14px 16px 14px 40px',
+                fontSize: 15, color: 'var(--text)', outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', overflow: 'hidden' }}>
+            {filtered.map((c, i) => (
+              <button
+                key={c.id}
+                onClick={() => setSelected(c)}
+                className="pressable"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                  minHeight: 64, padding: '0 16px', textAlign: 'left',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{
+                  width: 36, height: 36, borderRadius: '50%', background: 'var(--surface-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--accent)', fontWeight: 700, fontSize: 14, flexShrink: 0,
+                }}>
+                  {c.full_name.charAt(0)}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', color: 'var(--text)', fontWeight: 500, fontSize: 15 }}>{c.full_name}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 12, fontFamily: 'monospace' }}>{c.account_number ?? '—'}</span>
+                </span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                No client found.
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        /* Step 2: amount + confirm */
+        <div>
+          <button
+            onClick={() => setSelected(null)}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: 0, marginBottom: 16, fontFamily: 'inherit' }}
+          >
+            ← Change client
+          </button>
+
+          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-card)', padding: '16px 20px', marginBottom: 20 }}>
+            <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 17 }}>{selected.full_name}</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: 12, fontFamily: 'monospace', marginTop: 2 }}>{selected.account_number ?? '—'}</p>
+          </div>
+
+          <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+            Amount (GH₵)
+          </label>
+          <div style={{ position: 'relative', marginBottom: 20 }}>
+            <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 20, fontWeight: 500 }}>
+              GH₵
+            </span>
+            <input
+              type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="0.00" autoFocus
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              style={{
+                width: '100%', background: 'var(--surface)', border: 'none',
+                borderRadius: 'var(--radius-card)', padding: '20px 16px 20px 64px',
+                fontSize: 26, fontWeight: 700, color: 'var(--text)', outline: 'none',
+                fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums', textAlign: 'right',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+            {(['cash', 'momo'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                className="pressable"
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '14px 16px', borderRadius: 'var(--radius-btn)', border: 'none',
+                  cursor: 'pointer', fontWeight: 600, fontSize: 15, fontFamily: 'inherit',
+                  background: method === m ? (m === 'momo' ? '#fef3c7' : 'var(--accent)') : 'var(--surface)',
+                  color: method === m ? (m === 'momo' ? '#92400e' : '#f9fafb') : 'var(--text-muted)',
+                  transition: 'all 120ms',
+                }}
+              >
+                {m === 'momo' ? <Wifi size={16} /> : <Banknote size={16} />}
+                {m === 'momo' ? 'MoMo' : 'Cash'}
+              </button>
+            ))}
+          </div>
+
+          {error && (
+            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: 13, marginBottom: 16 }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !amount}
+            className="pressable"
+            style={{
+              width: '100%', padding: '18px 20px',
+              background: loading || !amount ? 'var(--border)' : 'var(--accent)',
+              color: '#f9fafb', border: 'none', borderRadius: 'var(--radius-btn)',
+              fontSize: 17, fontWeight: 600,
+              cursor: loading || !amount ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            {loading ? 'Recording…' : `Record GH₵ ${amount || '0.00'}`}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
