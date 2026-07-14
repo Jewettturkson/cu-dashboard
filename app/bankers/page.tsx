@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabase'
 import type { Banker } from '@/lib/supabase'
 
+// Live data — always fetch fresh, never serve a build-time snapshot
+export const dynamic = 'force-dynamic'
+
 export default async function BankersPage() {
   const [{ data: bankers, error }, { data: txnData }] = await Promise.all([
     supabase.from('bankers').select('*').order('full_name'),

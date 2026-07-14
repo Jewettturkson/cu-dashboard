@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase'
 import { Users, Banknote, TrendingUp, UserCheck } from 'lucide-react'
 import LogDepositButton from '@/components/LogDepositButton'
 
+// Live dashboard — always fetch fresh data, never serve a build-time snapshot
+export const dynamic = 'force-dynamic'
+
 const formatGHS = (amount: number) =>
   `GH₵ ${amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 

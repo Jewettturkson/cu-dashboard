@@ -1,6 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import type { Client } from '@/lib/supabase'
 import { Wifi, WifiOff } from 'lucide-react'
+import AddClientButton from '@/components/AddClientButton'
+
+// Live data — always fetch fresh, never serve a build-time snapshot
+export const dynamic = 'force-dynamic'
 
 const formatGHS = (n: number) =>
   `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
@@ -22,21 +26,7 @@ export default async function ClientsPage() {
             {clients?.length ?? 0} registered savers
           </p>
         </div>
-        <button
-          style={{
-            background: 'var(--accent)',
-            color: '#f9fafb',
-            border: 'none',
-            borderRadius: 'var(--radius-btn)',
-            padding: '10px 16px',
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          + Add client
-        </button>
+        <AddClientButton />
       </div>
 
       <div

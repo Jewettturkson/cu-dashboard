@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase'
 import type { Transaction } from '@/lib/supabase'
 import LogDepositButton from '@/components/LogDepositButton'
 
+// Live data — always fetch fresh, never serve a build-time snapshot
+export const dynamic = 'force-dynamic'
+
 const formatGHS = (n: number) =>
   `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
