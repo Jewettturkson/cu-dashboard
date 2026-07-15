@@ -18,6 +18,14 @@ const formatDate = (dateStr: string) =>
 
 export default async function DashboardPage() {
   const supabase = await createClient()
+
+  // Whose union is this? Multi-tenant from migration 006 onward.
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('organizations(name)').eq('id', user.id).single()
+    : { data: null }
+  const orgName = (profile as { organizations?: { name: string } } | null)?.organizations?.name
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -62,7 +70,7 @@ export default async function DashboardPage() {
           {new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
         <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24, marginTop: 2 }}>
-          Dashboard
+          {orgName ?? 'Dashboard'}
         </h1>
       </div>
 

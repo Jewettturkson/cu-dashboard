@@ -44,7 +44,8 @@
 - [ ] Monthly statement generation (PDF) per client + union summary
 - [ ] Admin user management UI (create bankers, reset passwords — no more Supabase dashboard)
 - [ ] Onboarding wizard: union profile → import clients CSV → create bankers → go live
-- [ ] PWA installability (manifest, icons, service worker shell caching)
+- [ ] **Data migration playbook** — migrate master data + opening balances, never transaction history: opening-balance import (tagged transaction type, audit-visible as "migration"), printable post-import reconciliation statement for treasurer sign-off ("total imported = total on your books"), Excel cleanup as white-glove onboarding, per-vendor importers for legacy software as encountered
+- [ ] **PWA + offline-first collect** (pulled forward from Phase 3 — launch requirement for Ghana connectivity): manifest/icons/service-worker shell caching; offline deposit queue in IndexedDB with client-generated idempotency UUIDs; explicit sync states (amber "waiting to sync" vs green "recorded"); balances labeled "as of last sync"; approvals remain online-only (admin is in the office). The append-only ledger is what makes this tractable — offline queues of inserts merge without conflicts
 
 **Business**
 - [ ] Register with Data Protection Commission as data controller
@@ -63,7 +64,7 @@
 **Product**
 - [ ] **MTN MoMo API integration** — Request-to-Pay deposits + disbursement withdrawals, webhook confirmation, `momo_ref` on every digital transaction; each union onboards its own MTN merchant account (keeps us outside PSP licensing)
 - [ ] **Loan management module** (premium tier): products, approval workflow, schedules, repayments via collect flow, arrears + PAR dashboard
-- [ ] **Offline-first collect** — IndexedDB queue, explicit sync states, idempotent retries
+- [ ] Offline-first hardening — background sync API, conflict telemetry, multi-day offline stress testing (core offline queue ships in Phase 2)
 - [ ] USSD balance check (shared NCA shortcode across unions)
 - [ ] Reporting suite: CUA/BoG-aligned prudential returns, board packs
 - [ ] Owner analytics: cross-union health metrics (churn risk, activity)
