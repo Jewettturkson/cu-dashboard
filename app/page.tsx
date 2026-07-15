@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import { Users, Banknote, TrendingUp, UserCheck } from 'lucide-react'
 import LogDepositButton from '@/components/LogDepositButton'
+import PendingWithdrawals from '@/components/PendingWithdrawals'
 
 // Live dashboard — always fetch fresh data, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,7 @@ export default async function DashboardPage() {
     { data: todayTxns },
     { data: monthTxns },
     { data: recentTxns },
+    { data: pendingWithdrawals },
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('bankers').select('*', { count: 'exact', head: true }).eq('is_active', true),
@@ -36,6 +38,10 @@ export default async function DashboardPage() {
       .select('*, clients(full_name, account_number), bankers(full_name)')
       .order('created_at', { ascending: false })
       .limit(10),
+    supabase.from('withdrawal_requests')
+      .select('id, amount, method, created_at, clients(full_name, account_number), bankers(full_name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
   ])
 
   const todayTotal  = (todayTxns  ?? []).reduce((s, t) => s + Number(t.amount), 0)
@@ -106,6 +112,9 @@ export default async function DashboardPage() {
       <div className="hidden md:flex justify-end mb-4">
         <LogDepositButton />
       </div>
+
+      {/* Withdrawals awaiting approval — hidden when empty */}
+      <PendingWithdrawals requests={(pendingWithdrawals as never[]) ?? []} />
 
       {/* Recent transactions */}
       <div>

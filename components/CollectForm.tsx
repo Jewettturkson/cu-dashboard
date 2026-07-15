@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Banknote, Wifi, CheckCircle, LogOut, Search } from 'lucide-react'
+import { Banknote, Wifi, CheckCircle, Clock, LogOut, Search } from 'lucide-react'
 
 const supabase = createClient()
 
@@ -26,8 +26,9 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
   const [selected, setSelected] = useState<ClientRow | null>(null)
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'momo'>('cash')
+  const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit')
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState<{ client: string; amount: string } | null>(null)
+  const [success, setSuccess] = useState<{ client: string; amount: string; mode: 'deposit' | 'withdraw' } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
@@ -50,18 +51,27 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.from('transactions').insert({
-      client_id: selected.id,
-      banker_id: bankerId,
-      amount: parseFloat(amount),
-      type: 'deposit',
-      method,
-    })
+    // Deposits post straight to the ledger; withdrawals only create
+    // a request — money moves when an admin approves it.
+    const { error } = mode === 'deposit'
+      ? await supabase.from('transactions').insert({
+          client_id: selected.id,
+          banker_id: bankerId,
+          amount: parseFloat(amount),
+          type: 'deposit',
+          method,
+        })
+      : await supabase.from('withdrawal_requests').insert({
+          client_id: selected.id,
+          banker_id: bankerId,
+          amount: parseFloat(amount),
+          method,
+        })
 
     setLoading(false)
     if (error) { setError(error.message); return }
 
-    setSuccess({ client: selected.full_name, amount })
+    setSuccess({ client: selected.full_name, amount, mode })
   }
 
   const reset = () => {
@@ -69,19 +79,32 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
     setSelected(null)
     setAmount('')
     setMethod('cash')
+    setMode('deposit')
     setQuery('')
   }
 
   /* ── Success screen: unmissable confirmation ── */
   if (success) {
+    const isDeposit = success.mode === 'deposit'
     return (
       <div style={{ padding: '64px 20px', textAlign: 'center' }}>
-        <CheckCircle size={72} style={{ color: 'var(--success)', margin: '0 auto 16px' }} />
-        <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 22 }}>Deposit recorded</p>
+        {isDeposit ? (
+          <CheckCircle size={72} style={{ color: 'var(--success)', margin: '0 auto 16px' }} />
+        ) : (
+          <Clock size={72} style={{ color: 'var(--warning)', margin: '0 auto 16px' }} />
+        )}
+        <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 22 }}>
+          {isDeposit ? 'Deposit recorded' : 'Withdrawal requested'}
+        </p>
         <p style={{ color: 'var(--text)', fontSize: 17, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
           GH₵ {Number(success.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
         </p>
         <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>{success.client}</p>
+        {!isDeposit && (
+          <p style={{ color: 'var(--warning)', fontSize: 14, marginTop: 12, fontWeight: 500 }}>
+            Waiting for admin approval — do not pay out yet.
+          </p>
+        )}
         <button
           onClick={reset}
           className="pressable"
@@ -92,7 +115,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
             fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
-          Log another deposit
+          Log another
         </button>
       </div>
     )
@@ -189,6 +212,36 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
             <p style={{ color: 'var(--text-dim)', fontSize: 12, fontFamily: 'monospace', marginTop: 2 }}>{selected.account_number ?? '—'}</p>
           </div>
 
+          {/* Deposit / Withdrawal mode */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {(['deposit', 'withdraw'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="pressable"
+                style={{
+                  flex: 1, padding: '12px 16px',
+                  borderRadius: 'var(--radius-btn)', border: 'none',
+                  cursor: 'pointer', fontWeight: 600, fontSize: 14, fontFamily: 'inherit',
+                  background: mode === m
+                    ? (m === 'withdraw' ? 'var(--danger)' : 'var(--success)')
+                    : 'var(--surface)',
+                  color: mode === m ? '#f9fafb' : 'var(--text-muted)',
+                  transition: 'all 120ms',
+                }}
+              >
+                {m === 'deposit' ? 'Deposit' : 'Withdrawal'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'withdraw' && (
+            <p style={{ color: 'var(--warning)', fontSize: 13, fontWeight: 500, marginBottom: 16 }}>
+              Withdrawals need admin approval before paying out.
+            </p>
+          )}
+
           <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
             Amount (GH₵)
           </label>
@@ -249,7 +302,11 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
               cursor: loading || !amount ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             }}
           >
-            {loading ? 'Recording…' : `Record GH₵ ${amount || '0.00'}`}
+            {loading
+              ? 'Recording…'
+              : mode === 'deposit'
+                ? `Record GH₵ ${amount || '0.00'}`
+                : `Request withdrawal of GH₵ ${amount || '0.00'}`}
           </button>
         </div>
       )}

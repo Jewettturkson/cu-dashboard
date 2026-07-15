@@ -38,7 +38,13 @@ function describe(e: AuditEntry): string {
     case 'transaction.deposit':
       return `logged a ${d.method === 'momo' ? 'MoMo' : 'cash'} deposit of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'transaction.withdrawal':
-      return `recorded a withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+      return `paid out a withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+    case 'withdrawal.requested':
+      return `requested a ${d.method === 'momo' ? 'MoMo' : 'cash'} withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+    case 'withdrawal.approved':
+      return `approved the withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+    case 'withdrawal.rejected':
+      return `rejected the withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'client.create':
       return `added client ${d.client_name ?? ''}${d.account_number ? ` (${d.account_number})` : ''}`
     case 'client.update':
@@ -55,6 +61,8 @@ function describe(e: AuditEntry): string {
 function iconFor(action: string) {
   if (action === 'transaction.deposit')    return { Icon: ArrowDownCircle, color: 'var(--success)' }
   if (action === 'transaction.withdrawal') return { Icon: ArrowUpCircle,   color: 'var(--danger)' }
+  if (action === 'withdrawal.rejected')    return { Icon: ArrowUpCircle,   color: 'var(--text-muted)' }
+  if (action.startsWith('withdrawal.'))    return { Icon: ArrowUpCircle,   color: 'var(--warning)' }
   if (action.startsWith('client.'))        return { Icon: UserPlus,        color: 'var(--accent)' }
   if (action.startsWith('banker.'))        return { Icon: UserCog,         color: 'var(--warning)' }
   return { Icon: ShieldQuestion, color: 'var(--text-muted)' }
