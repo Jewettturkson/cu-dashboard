@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Banknote, Wifi, CheckCircle, Clock, LogOut, Search } from 'lucide-react'
+import { Banknote, Wifi, CheckCircle, Clock, CloudOff, LogOut, Search } from 'lucide-react'
+import { queueDeposit, listQueued, flushQueue } from '@/lib/offline-queue'
 
 const supabase = createClient()
 
@@ -29,8 +30,9 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit')
   const [balance, setBalance] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState<{ client: string; amount: string; mode: 'deposit' | 'withdraw' } | null>(null)
+  const [success, setSuccess] = useState<{ client: string; amount: string; mode: 'deposit' | 'withdraw'; offline?: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pendingSync, setPendingSync] = useState(0)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -41,6 +43,15 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
         (c.account_number ?? '').toLowerCase().includes(q)
     )
   }, [clients, query])
+
+  // Track the offline queue: count on mount, refresh when the
+  // global sync (PWASetup) drains it or we add to it.
+  useEffect(() => {
+    listQueued().then(q => setPendingSync(q.length)).catch(() => {})
+    const onChange = (e: Event) => setPendingSync((e as CustomEvent<number>).detail)
+    window.addEventListener('cu-queue-changed', onChange)
+    return () => window.removeEventListener('cu-queue-changed', onChange)
+  }, [])
 
   // Fetch this one client's balance when entering withdrawal mode —
   // bankers can't browse balances, but a client asking to withdraw
@@ -67,10 +78,19 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
     setLoading(true)
     setError(null)
 
+    // Withdrawals need the server (balance check + approval queue)
+    if (mode === 'withdraw' && !navigator.onLine) {
+      setLoading(false)
+      setError('Withdrawal requests need a connection. Deposits still work offline.')
+      return
+    }
+
     // Deposits post straight to the ledger; withdrawals only create
     // a request — money moves when an admin approves it.
+    const depositId = crypto.randomUUID() // idempotency key for offline sync
     const { error } = mode === 'deposit'
       ? await supabase.from('transactions').insert({
+          id: depositId,
           client_id: selected.id,
           banker_id: bankerId,
           amount: parseFloat(amount),
@@ -85,9 +105,33 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
         })
 
     setLoading(false)
+
+    // Network failure on a deposit → queue it locally, sync later.
+    const isNetworkError = error && (!navigator.onLine || /fetch|network/i.test(error.message))
+    if (mode === 'deposit' && isNetworkError) {
+      try {
+        await queueDeposit({
+          id: depositId,
+          client_id: selected.id,
+          banker_id: bankerId,
+          amount: parseFloat(amount),
+          type: 'deposit',
+          method,
+          queued_at: new Date().toISOString(),
+        })
+        const q = await listQueued()
+        setPendingSync(q.length)
+        setSuccess({ client: selected.full_name, amount, mode, offline: true })
+      } catch {
+        setError('Could not save offline on this device. Please retry when connected.')
+      }
+      return
+    }
+
     if (error) { setError(error.message); return }
 
     setSuccess({ client: selected.full_name, amount, mode })
+    flushQueue(supabase).catch(() => {}) // good moment to drain any backlog
   }
 
   const reset = () => {
@@ -104,19 +148,27 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
     const isDeposit = success.mode === 'deposit'
     return (
       <div style={{ padding: '64px 20px', textAlign: 'center' }}>
-        {isDeposit ? (
+        {success.offline ? (
+          <CloudOff size={72} style={{ color: 'var(--warning)', margin: '0 auto 16px' }} />
+        ) : isDeposit ? (
           <CheckCircle size={72} style={{ color: 'var(--success)', margin: '0 auto 16px' }} />
         ) : (
           <Clock size={72} style={{ color: 'var(--warning)', margin: '0 auto 16px' }} />
         )}
         <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 22 }}>
-          {isDeposit ? 'Deposit recorded' : 'Withdrawal requested'}
+          {success.offline ? 'Saved on this phone' : isDeposit ? 'Deposit recorded' : 'Withdrawal requested'}
         </p>
         <p style={{ color: 'var(--text)', fontSize: 17, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
           GH₵ {Number(success.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
         </p>
         <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>{success.client}</p>
-        {!isDeposit && (
+        {success.offline && (
+          <p style={{ color: 'var(--warning)', fontSize: 14, marginTop: 12, fontWeight: 500 }}>
+            No network — will send automatically when you have signal.
+            Do NOT re-enter this deposit.
+          </p>
+        )}
+        {!isDeposit && !success.offline && (
           <p style={{ color: 'var(--warning)', fontSize: 14, marginTop: 12, fontWeight: 500 }}>
             Waiting for admin approval — do not pay out yet.
           </p>
@@ -144,6 +196,16 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
         <div>
           <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 20 }}>Collect</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>{bankerName}</p>
+          {pendingSync > 0 && (
+            <p style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              color: '#92400e', background: '#fef3c7',
+              fontSize: 12, fontWeight: 600, padding: '2px 8px',
+              borderRadius: 99, marginTop: 6,
+            }}>
+              <CloudOff size={11} /> {pendingSync} waiting to sync
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {isAdmin && (

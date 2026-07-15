@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 type Txn = {
   id: string
   amount: number
-  type: 'deposit' | 'withdrawal'
+  type: 'deposit' | 'withdrawal' | 'opening'
   method: 'cash' | 'momo'
   notes: string | null
   created_at: string
@@ -51,7 +51,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   // Running balance: walk the ledger oldest-first, then show newest-first
   let running = 0
   const timeline = ((txns as unknown as Txn[]) ?? []).map(t => {
-    running += t.type === 'deposit' ? Number(t.amount) : -Number(t.amount)
+    running += t.type === 'withdrawal' ? -Number(t.amount) : Number(t.amount)
     return { ...t, balanceAfter: running }
   }).reverse()
 
@@ -171,15 +171,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             padding: '12px 20px', minHeight: 64,
             borderTop: i === 0 ? 'none' : '1px solid var(--border)',
           }}>
-            {t.type === 'deposit'
-              ? <ArrowDownCircle size={20} style={{ color: 'var(--success)', flexShrink: 0 }} />
-              : <ArrowUpCircle size={20} style={{ color: 'var(--danger)', flexShrink: 0 }} />}
+            {t.type === 'withdrawal'
+              ? <ArrowUpCircle size={20} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              : <ArrowDownCircle size={20} style={{ color: t.type === 'opening' ? 'var(--accent)' : 'var(--success)', flexShrink: 0 }} />}
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500 }}>
-                {t.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                {t.type === 'deposit' ? 'Deposit' : t.type === 'opening' ? 'Opening balance' : 'Withdrawal'}
                 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-                  {' '}· {t.method === 'momo' ? 'MoMo' : 'Cash'}
+                  {t.type !== 'opening' && ` · ${t.method === 'momo' ? 'MoMo' : 'Cash'}`}
                   {t.bankers?.full_name ? ` · ${t.bankers.full_name}` : ''}
                 </span>
               </p>
@@ -191,10 +191,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <p style={{
-                color: t.type === 'deposit' ? 'var(--success)' : 'var(--danger)',
+                color: t.type === 'withdrawal' ? 'var(--danger)' : t.type === 'opening' ? 'var(--accent)' : 'var(--success)',
                 fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums',
               }}>
-                {t.type === 'deposit' ? '+' : '−'}{formatGHS(Number(t.amount))}
+                {t.type === 'withdrawal' ? '−' : '+'}{formatGHS(Number(t.amount))}
               </p>
               <p style={{ color: 'var(--text-dim)', fontSize: 11, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
                 bal {formatGHS(t.balanceAfter)}

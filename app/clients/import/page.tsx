@@ -14,6 +14,7 @@ type ParsedRow = {
   momo_number: string | null
   account_number: string | null
   address: string | null
+  opening_balance: number | null
   problem?: string
 }
 
@@ -56,6 +57,7 @@ function headerIndex(headers: string[]) {
     momo: find('momo_number', 'momo', 'mobile_money'),
     account: find('account_number', 'account', 'acc', 'account_no'),
     address: find('address', 'location', 'area'),
+    balance: find('opening_balance', 'balance', 'opening', 'bal'),
   }
 }
 
@@ -86,16 +88,20 @@ export default function ImportClientsPage() {
     const seenPhones = new Set<string>()
     const data: ParsedRow[] = parsed.slice(1).map(r => {
       const get = (i: number) => (i >= 0 ? (r[i] ?? '').trim() : '')
+      const rawBal = get(idx.balance).replace(/[^\d.-]/g, '')  // tolerate "GH₵ 1,200.00"
       const row: ParsedRow = {
         full_name: get(idx.name),
         phone: get(idx.phone),
         momo_number: get(idx.momo) || null,
         account_number: get(idx.account) || null,
         address: get(idx.address) || null,
+        opening_balance: rawBal ? parseFloat(rawBal) : null,
       }
       if (!row.full_name) row.problem = 'Missing name'
       else if (!row.phone) row.problem = 'Missing phone'
       else if (seenPhones.has(row.phone)) row.problem = 'Duplicate phone in file'
+      else if (row.opening_balance !== null && (isNaN(row.opening_balance) || row.opening_balance < 0))
+        row.problem = 'Invalid opening balance'
       seenPhones.add(row.phone)
       return row
     })
@@ -117,15 +123,29 @@ export default function ImportClientsPage() {
     for (let i = 0; i < valid.length; i += CHUNK) {
       const chunk = valid.slice(i, i + CHUNK)
       const results = await Promise.allSettled(
-        chunk.map(r =>
-          supabase.from('clients').insert({
+        chunk.map(async r => {
+          const { data, error } = await supabase.from('clients').insert({
             full_name: r.full_name,
             phone: r.phone,
             momo_number: r.momo_number,
             account_number: r.account_number,
             address: r.address,
-          }).then(({ error }) => { if (error) throw new Error(error.message) })
-        )
+          }).select('id').single()
+          if (error) throw new Error(error.message)
+
+          // Migrated balance: one tagged 'opening' entry — audited,
+          // excluded from collection stats and reconciliation.
+          if (r.opening_balance && r.opening_balance > 0) {
+            const { error: obErr } = await supabase.from('transactions').insert({
+              client_id: data.id,
+              amount: r.opening_balance,
+              type: 'opening',
+              method: 'cash',
+              notes: 'Opening balance (migrated)',
+            })
+            if (obErr) throw new Error(`Client added but opening balance failed: ${obErr.message}`)
+          }
+        })
       )
       results.forEach((res, j) => {
         if (res.status === 'fulfilled') ok++
@@ -164,7 +184,8 @@ export default function ImportClientsPage() {
       <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24, marginTop: 12 }}>Import clients</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4, marginBottom: 20 }}>
         Upload a CSV of your existing client book. Required columns: <code>full_name</code>, <code>phone</code>.
-        Optional: <code>momo_number</code>, <code>account_number</code>, <code>address</code>.
+        Optional: <code>momo_number</code>, <code>account_number</code>, <code>address</code>, <code>opening_balance</code>
+        (each client&apos;s current balance from the old books — recorded as an audited migration entry).
       </p>
 
       {result ? (
@@ -242,7 +263,7 @@ export default function ImportClientsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Name', 'Phone', 'MoMo', 'Account', 'Address', ''].map(h => (
+                  {['Name', 'Phone', 'MoMo', 'Account', 'Balance', ''].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                   ))}
                 </tr>
@@ -254,7 +275,9 @@ export default function ImportClientsPage() {
                     <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{r.phone || '—'}</td>
                     <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{r.momo_number ?? '—'}</td>
                     <td style={{ padding: '8px 10px', color: 'var(--text-dim)', fontFamily: 'monospace', fontSize: 12 }}>{r.account_number ?? '—'}</td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{r.address ?? '—'}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                      {r.opening_balance !== null ? `GH₵ ${r.opening_balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}` : '—'}
+                    </td>
                     <td style={{ padding: '8px 10px' }}>
                       {r.problem && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--warning)', fontSize: 12 }}>

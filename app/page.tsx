@@ -199,13 +199,13 @@ export default async function DashboardPage() {
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <p
                     style={{
-                      color: txn.type === 'deposit' ? 'var(--success)' : 'var(--danger)',
+                      color: txn.type === 'withdrawal' ? 'var(--danger)' : txn.type === 'opening' ? 'var(--accent)' : 'var(--success)',
                       fontWeight: 600,
                       fontSize: 14,
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {txn.type === 'deposit' ? '+' : '-'}{formatGHS(Number(txn.amount))}
+                    {txn.type === 'withdrawal' ? '-' : '+'}{formatGHS(Number(txn.amount))}
                   </p>
                   <p style={{ color: 'var(--text-dim)', fontSize: 11 }}>
                     {formatDate(txn.created_at)} · {formatTime(txn.created_at)}

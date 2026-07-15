@@ -93,13 +93,13 @@ export default async function TransactionsPage({
               <div
                 style={{
                   width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                  background: txn.type === 'deposit' ? '#d1fae5' : '#fff1f2',
+                  background: txn.type === 'withdrawal' ? '#fff1f2' : txn.type === 'opening' ? 'var(--surface-2)' : '#d1fae5',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: txn.type === 'deposit' ? 'var(--success)' : 'var(--danger)',
+                  color: txn.type === 'withdrawal' ? 'var(--danger)' : txn.type === 'opening' ? 'var(--accent)' : 'var(--success)',
                   fontWeight: 700, fontSize: 16,
                 }}
               >
-                {txn.type === 'deposit' ? '↑' : '↓'}
+                {txn.type === 'withdrawal' ? '↓' : '↑'}
               </div>
 
               {/* Client + meta */}
@@ -108,7 +108,7 @@ export default async function TransactionsPage({
                   {(txn as any).clients?.full_name ?? '—'}
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                  {txn.method === 'momo' ? 'MoMo' : 'Cash'}
+                  {txn.type === 'opening' ? 'Opening balance' : txn.method === 'momo' ? 'MoMo' : 'Cash'}
                   {(txn as any).bankers?.full_name ? ` · ${(txn as any).bankers.full_name}` : ''}
                   {txn.notes ? ` · ${txn.notes}` : ''}
                 </p>
@@ -119,10 +119,10 @@ export default async function TransactionsPage({
                 <p
                   style={{
                     fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums',
-                    color: txn.type === 'deposit' ? 'var(--success)' : 'var(--danger)',
+                    color: txn.type === 'withdrawal' ? 'var(--danger)' : txn.type === 'opening' ? 'var(--accent)' : 'var(--success)',
                   }}
                 >
-                  {txn.type === 'deposit' ? '+' : '-'}{formatGHS(Number(txn.amount))}
+                  {txn.type === 'withdrawal' ? '-' : '+'}{formatGHS(Number(txn.amount))}
                 </p>
                 <p style={{ color: 'var(--text-dim)', fontSize: 11, marginTop: 2 }}>
                   {formatDateTime(txn.created_at)}

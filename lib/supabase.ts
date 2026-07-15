@@ -32,7 +32,7 @@ export type Transaction = {
   client_id: string
   banker_id: string | null
   amount: number
-  type: 'deposit' | 'withdrawal'
+  type: 'deposit' | 'withdrawal' | 'opening'
   method: 'cash' | 'momo'
   notes: string | null
   created_at: string

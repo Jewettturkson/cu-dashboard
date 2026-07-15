@@ -39,6 +39,8 @@ function describe(e: AuditEntry): string {
       return `logged a ${d.method === 'momo' ? 'MoMo' : 'cash'} deposit of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'transaction.withdrawal':
       return `paid out a withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+    case 'transaction.opening':
+      return `recorded a migrated opening balance of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'withdrawal.requested':
       return `requested a ${d.method === 'momo' ? 'MoMo' : 'cash'} withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'withdrawal.approved':

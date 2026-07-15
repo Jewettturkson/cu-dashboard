@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import TopNav from '@/components/TopNav'
 import BottomNav from '@/components/BottomNav'
+import PWASetup from '@/components/PWASetup'
 
 export const metadata: Metadata = {
   title: 'CU Dashboard',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <PWASetup />
         <TopNav />
         <main
           style={{

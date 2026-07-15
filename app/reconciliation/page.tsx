@@ -9,7 +9,7 @@ const formatGHS = (n: number) =>
 
 type Row = {
   amount: number
-  type: 'deposit' | 'withdrawal'
+  type: 'deposit' | 'withdrawal' | 'opening'
   method: 'cash' | 'momo'
   banker_id: string | null
   bankers: { full_name: string } | null
@@ -47,6 +47,7 @@ export default async function ReconciliationPage({
   // Group by banker (office/admin entries fall under "Office")
   const byBanker = new Map<string, BankerTotals>()
   for (const t of (txns as unknown as Row[]) ?? []) {
+    if (t.type === 'opening') continue  // migrated balances aren't cash a banker handled
     const key = t.banker_id ?? 'office'
     const entry = byBanker.get(key) ?? {
       name: t.bankers?.full_name ?? 'Office / no banker',
