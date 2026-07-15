@@ -120,10 +120,15 @@ export default async function DashboardPage() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 style={{ color: 'var(--text)', fontWeight: 600, fontSize: 17 }}>Recent activity</h2>
-          {/* Mobile has no room for a 5th tab — audit is reachable from here */}
-          <Link href="/audit" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
-            Audit log
-          </Link>
+          {/* Mobile has no room for more tabs — these live here */}
+          <div style={{ display: 'flex', gap: 14 }}>
+            <Link href="/reconciliation" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+              Daily report
+            </Link>
+            <Link href="/audit" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+              Audit log
+            </Link>
+          </div>
         </div>
 
         <div

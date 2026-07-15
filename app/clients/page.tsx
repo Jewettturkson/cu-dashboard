@@ -1,14 +1,12 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import type { Client } from '@/lib/supabase'
-import Link from 'next/link'
-import { Wifi, WifiOff, ChevronRight } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import AddClientButton from '@/components/AddClientButton'
+import ClientList from '@/components/ClientList'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
-
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 export default async function ClientsPage() {
   const supabase = await createClient()
@@ -19,105 +17,42 @@ export default async function ClientsPage() {
 
   if (error) return <p style={{ color: 'var(--danger)', padding: 20 }}>Error: {error.message}</p>
 
+  const rows = (clients ?? []).map((c: Client) => ({
+    id: c.id,
+    full_name: c.full_name,
+    account_number: c.account_number,
+    momo_number: c.momo_number,
+    is_active: c.is_active,
+    balance: Number(c.accounts?.[0]?.balance ?? 0),
+  }))
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24 }}>Clients</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>
-            {clients?.length ?? 0} registered savers
+            {rows.length} registered savers
           </p>
         </div>
-        <AddClientButton />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Link
+            href="/clients/import"
+            aria-label="Import clients from CSV"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--surface)', color: 'var(--text-secondary)',
+              borderRadius: 'var(--radius-btn)', padding: '10px 14px',
+              fontSize: 14, fontWeight: 500, textDecoration: 'none',
+            }}
+          >
+            <Upload size={14} /> Import
+          </Link>
+          <AddClientButton />
+        </div>
       </div>
 
-      <div
-        style={{
-          background: 'var(--bg)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-card)',
-          boxShadow: 'var(--shadow-card)',
-          overflow: 'hidden',
-        }}
-      >
-        {(clients ?? []).map((client: Client, i: number) => {
-          const balance = (client as any).accounts?.[0]?.balance ?? 0
-          return (
-            <Link
-              key={client.id}
-              href={`/clients/${client.id}`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 20px',
-                height: 64,
-                borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-                gap: 12,
-                textDecoration: 'none',
-              }}
-            >
-              {/* Avatar */}
-              <div
-                style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: 'var(--surface-2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--accent)', fontWeight: 700, fontSize: 14, flexShrink: 0,
-                }}
-              >
-                {client.full_name.charAt(0)}
-              </div>
-
-              {/* Name + account */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {client.full_name}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 11, fontFamily: 'monospace' }}>
-                    {client.account_number ?? '—'}
-                  </span>
-                  {client.momo_number ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--warning)', fontSize: 11 }}>
-                      <Wifi size={10} /> MoMo
-                    </span>
-                  ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--text-dim)', fontSize: 11 }}>
-                      <WifiOff size={10} />
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Balance */}
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <p style={{ color: 'var(--text)', fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
-                  {formatGHS(balance)}
-                </p>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    background: client.is_active ? '#d1fae5' : 'var(--surface)',
-                    color: client.is_active ? '#065f46' : 'var(--text-muted)',
-                    fontSize: 10, fontWeight: 600,
-                    padding: '1px 6px', borderRadius: 99, marginTop: 2,
-                  }}
-                >
-                  {client.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-
-              <ChevronRight size={16} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-            </Link>
-          )
-        })}
-
-        {(clients ?? []).length === 0 && (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-            No clients yet.
-          </div>
-        )}
-      </div>
+      <ClientList clients={rows} />
     </div>
   )
 }

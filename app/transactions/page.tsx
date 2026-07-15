@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import type { Transaction } from '@/lib/supabase'
 import LogDepositButton from '@/components/LogDepositButton'
+import TransactionFilters from '@/components/TransactionFilters'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
@@ -14,13 +15,30 @@ const formatDateTime = (d: string) => {
     ' · ' + dt.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; method?: string; banker?: string; from?: string; to?: string }>
+}) {
+  const { type, method, banker, from, to } = await searchParams
   const supabase = await createClient()
-  const { data: transactions, error } = await supabase
+
+  let query = supabase
     .from('transactions')
     .select('*, clients(full_name, account_number), bankers(full_name)')
     .order('created_at', { ascending: false })
     .limit(100)
+
+  if (type === 'deposit' || type === 'withdrawal') query = query.eq('type', type)
+  if (method === 'cash' || method === 'momo')      query = query.eq('method', method)
+  if (banker)                                       query = query.eq('banker_id', banker)
+  if (from) query = query.gte('created_at', `${from}T00:00:00`)
+  if (to)   query = query.lte('created_at', `${to}T23:59:59.999`)
+
+  const [{ data: transactions, error }, { data: bankers }] = await Promise.all([
+    query,
+    supabase.from('bankers').select('id, full_name').order('full_name'),
+  ])
 
   if (error) return <p style={{ color: 'var(--danger)', padding: 20 }}>Error: {error.message}</p>
 
@@ -42,6 +60,8 @@ export default async function TransactionsPage() {
           <LogDepositButton />
         </div>
       </div>
+
+      <TransactionFilters bankers={bankers ?? []} />
 
       <div
         style={{
