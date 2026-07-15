@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -27,6 +27,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'momo'>('cash')
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit')
+  const [balance, setBalance] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<{ client: string; amount: string; mode: 'deposit' | 'withdraw' } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +41,21 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
         (c.account_number ?? '').toLowerCase().includes(q)
     )
   }, [clients, query])
+
+  // Fetch this one client's balance when entering withdrawal mode —
+  // bankers can't browse balances, but a client asking to withdraw
+  // already knows theirs from their susu book.
+  useEffect(() => {
+    if (mode !== 'withdraw' || !selected) { setBalance(null); return }
+    let cancelled = false
+    supabase.rpc('get_client_balance', { p_client_id: selected.id }).then(({ data }) => {
+      if (!cancelled) setBalance(data !== null ? Number(data) : null)
+    })
+    return () => { cancelled = true }
+  }, [mode, selected])
+
+  const overBalance =
+    mode === 'withdraw' && balance !== null && parseFloat(amount || '0') > balance
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -237,9 +253,24 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
           </div>
 
           {mode === 'withdraw' && (
-            <p style={{ color: 'var(--warning)', fontSize: 13, fontWeight: 500, marginBottom: 16 }}>
-              Withdrawals need admin approval before paying out.
-            </p>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: 'var(--surface)', borderRadius: 'var(--radius-card)', padding: '12px 16px',
+              }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500 }}>
+                  Available balance
+                </span>
+                <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>
+                  {balance === null
+                    ? '…'
+                    : `GH₵ ${balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`}
+                </span>
+              </div>
+              <p style={{ color: 'var(--warning)', fontSize: 13, fontWeight: 500, marginTop: 8 }}>
+                Withdrawals need admin approval before paying out.
+              </p>
+            </div>
           )}
 
           <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
@@ -284,6 +315,12 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
             ))}
           </div>
 
+          {overBalance && (
+            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: 13, marginBottom: 16 }}>
+              Amount exceeds available balance.
+            </div>
+          )}
+
           {error && (
             <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: 13, marginBottom: 16 }}>
               {error}
@@ -292,14 +329,14 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
 
           <button
             onClick={handleSubmit}
-            disabled={loading || !amount}
+            disabled={loading || !amount || overBalance}
             className="pressable"
             style={{
               width: '100%', padding: '18px 20px',
-              background: loading || !amount ? 'var(--border)' : 'var(--accent)',
+              background: loading || !amount || overBalance ? 'var(--border)' : 'var(--accent)',
               color: '#f9fafb', border: 'none', borderRadius: 'var(--radius-btn)',
               fontSize: 17, fontWeight: 600,
-              cursor: loading || !amount ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              cursor: loading || !amount || overBalance ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             }}
           >
             {loading
