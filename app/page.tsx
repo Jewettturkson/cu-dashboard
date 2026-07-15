@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import { Users, Banknote, TrendingUp, UserCheck } from 'lucide-react'
 import LogDepositButton from '@/components/LogDepositButton'
@@ -110,6 +111,10 @@ export default async function DashboardPage() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 style={{ color: 'var(--text)', fontWeight: 600, fontSize: 17 }}>Recent activity</h2>
+          {/* Mobile has no room for a 5th tab — audit is reachable from here */}
+          <Link href="/audit" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+            Audit log
+          </Link>
         </div>
 
         <div

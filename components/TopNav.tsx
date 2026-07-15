@@ -10,6 +10,7 @@ const nav = [
   { href: '/clients',      label: 'Clients' },
   { href: '/transactions', label: 'Transactions' },
   { href: '/bankers',      label: 'Bankers' },
+  { href: '/audit',        label: 'Audit' },
 ]
 
 export default function TopNav() {
