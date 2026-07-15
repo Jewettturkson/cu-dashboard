@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import type { Client } from '@/lib/supabase'
-import { Wifi, WifiOff } from 'lucide-react'
+import Link from 'next/link'
+import { Wifi, WifiOff, ChevronRight } from 'lucide-react'
 import AddClientButton from '@/components/AddClientButton'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
@@ -42,8 +43,9 @@ export default async function ClientsPage() {
         {(clients ?? []).map((client: Client, i: number) => {
           const balance = (client as any).accounts?.[0]?.balance ?? 0
           return (
-            <div
+            <Link
               key={client.id}
+              href={`/clients/${client.id}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -51,6 +53,7 @@ export default async function ClientsPage() {
                 height: 64,
                 borderTop: i === 0 ? 'none' : '1px solid var(--border)',
                 gap: 12,
+                textDecoration: 'none',
               }}
             >
               {/* Avatar */}
@@ -103,7 +106,9 @@ export default async function ClientsPage() {
                   {client.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
-            </div>
+
+              <ChevronRight size={16} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            </Link>
           )
         })}
 

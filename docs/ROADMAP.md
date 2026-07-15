@@ -40,6 +40,7 @@
 **Product**
 - [ ] **Multi-tenancy** — `organizations` table, `org_id` on every row, RLS scoping, org-level branding (name/logo on login + reports)
 - [ ] **SMS receipts to clients** (Arkesel/Hubtel) — the fraud-killer feature and first paid add-on
+- [ ] **Withdrawal consent verification** — client photos on profiles (capture at onboarding); SMS OTP to the *client's* phone to authorize withdrawal requests (rides the same SMS rails as receipts); post-approval SMS ("expect payment from <banker>"); client PIN only as an offline fallback later (hashed, rate-limited — weaker here because PINs are typed on the banker's device)
 - [ ] Monthly statement generation (PDF) per client + union summary
 - [ ] Admin user management UI (create bankers, reset passwords — no more Supabase dashboard)
 - [ ] Onboarding wizard: union profile → import clients CSV → create bankers → go live
