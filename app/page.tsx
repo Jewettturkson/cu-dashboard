@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
+import type { Transaction } from '@/lib/supabase'
+import { formatGHS, accraDateString, accraDayStart, accraMonthStart } from '@/lib/format'
 import { Users, Banknote, TrendingUp, UserCheck } from 'lucide-react'
 import LogDepositButton from '@/components/LogDepositButton'
 import PendingWithdrawals from '@/components/PendingWithdrawals'
@@ -7,14 +9,11 @@ import PendingWithdrawals from '@/components/PendingWithdrawals'
 // Live dashboard — always fetch fresh data, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
 
-const formatGHS = (amount: number) =>
-  `GH₵ ${amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
 const formatTime = (dateStr: string) =>
-  new Date(dateStr).toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })
+  new Date(dateStr).toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Accra' })
 
 const formatDate = (dateStr: string) =>
-  new Date(dateStr).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' })
+  new Date(dateStr).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', timeZone: 'Africa/Accra' })
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -26,9 +25,10 @@ export default async function DashboardPage() {
     : { data: null }
   const orgName = (profile as { organizations?: { name: string } } | null)?.organizations?.name
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  // "Today" is the credit union's day (Africa/Accra), not the server's
+  const accraToday = accraDateString()
+  const dayStartISO = accraDayStart(accraToday)
+  const monthStartISO = accraMonthStart(accraToday)
 
   const [
     { count: totalClients },
@@ -40,8 +40,8 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('bankers').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('transactions').select('amount').eq('type', 'deposit').gte('created_at', today.toISOString()),
-    supabase.from('transactions').select('amount').eq('type', 'deposit').gte('created_at', startOfMonth.toISOString()),
+    supabase.from('transactions').select('amount').eq('type', 'deposit').gte('created_at', dayStartISO),
+    supabase.from('transactions').select('amount').eq('type', 'deposit').gte('created_at', monthStartISO),
     supabase.from('transactions')
       .select('*, clients(full_name, account_number), bankers(full_name)')
       .order('created_at', { ascending: false })
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          {new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          {new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Accra' })}
         </p>
         <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24, marginTop: 2 }}>
           {orgName ?? 'Dashboard'}
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
               No transactions yet. Log your first deposit to get started.
             </div>
           ) : (
-            (recentTxns ?? []).map((txn: any, i: number) => (
+            ((recentTxns ?? []) as unknown as Transaction[]).map((txn, i) => (
               <div
                 key={txn.id}
                 style={{

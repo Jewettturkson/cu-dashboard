@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import type { Banker } from '@/lib/supabase'
+import { AddBankerButton, BankerStatusToggle } from '@/components/BankerAdmin'
+import { formatGHS } from '@/lib/format'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
@@ -22,16 +24,16 @@ export default async function BankersPage() {
     if (t.type === 'deposit') statsMap[t.banker_id].total += Number(t.amount)
   })
 
-  const formatGHS = (n: number) =>
-    `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
-
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24 }}>Bankers</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>
-          {(bankers ?? []).filter(b => b.is_active).length} active field officers
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24 }}>Bankers</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>
+            {(bankers ?? []).filter(b => b.is_active).length} active field officers
+          </p>
+        </div>
+        <AddBankerButton />
       </div>
 
       <div
@@ -106,6 +108,8 @@ export default async function BankersPage() {
                     {s.count} {s.count === 1 ? 'txn' : 'txns'}
                   </p>
                 </div>
+
+                <BankerStatusToggle bankerId={banker.id} isActive={banker.is_active} />
               </div>
             )
           })
@@ -127,7 +131,7 @@ export default async function BankersPage() {
         <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>ℹ</span>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5 }}>
           Amounts shown are total lifetime deposits collected by each banker.
-          Add or deactivate bankers via the Supabase dashboard for now.
+          Deactivating a banker also locks their login immediately.
         </p>
       </div>
     </div>

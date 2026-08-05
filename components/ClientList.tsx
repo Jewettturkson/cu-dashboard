@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Wifi, WifiOff, ChevronRight, Search } from 'lucide-react'
+import { formatGHS } from '@/lib/format'
 
 export type ClientRow = {
   id: string
@@ -12,9 +13,6 @@ export type ClientRow = {
   is_active: boolean
   balance: number
 }
-
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 // Instant in-memory search — fine well past pilot scale (thousands of rows).
 export default function ClientList({ clients }: { clients: ClientRow[] }) {

@@ -10,9 +10,20 @@ export default function LogDepositButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+        className="pressable"
+        style={{
+          background: 'var(--accent)',
+          color: '#f9fafb',
+          border: 'none',
+          borderRadius: 'var(--radius-btn)',
+          padding: '10px 16px',
+          fontSize: 14,
+          fontWeight: 500,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
       >
-        + Log Deposit
+        + Log deposit
       </button>
       {open && <LogDepositModal onClose={() => setOpen(false)} />}
     </>

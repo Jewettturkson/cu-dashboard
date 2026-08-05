@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Banknote, Wifi, CheckCircle, Clock, CloudOff, LogOut, Search } from 'lucide-react'
 import { queueDeposit, listQueued, flushQueue } from '@/lib/offline-queue'
+import { formatGHS } from '@/lib/format'
 
 const supabase = createClient()
 
@@ -55,9 +56,12 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
 
   // Fetch this one client's balance when entering withdrawal mode —
   // bankers can't browse balances, but a client asking to withdraw
-  // already knows theirs from their susu book.
+  // already knows theirs from their susu book. (Every banker lookup
+  // is written to the audit log server-side.) Balance is cleared in
+  // the mode/selection handlers, not here, so the effect only syncs
+  // with the external system.
   useEffect(() => {
-    if (mode !== 'withdraw' || !selected) { setBalance(null); return }
+    if (mode !== 'withdraw' || !selected) return
     let cancelled = false
     supabase.rpc('get_client_balance', { p_client_id: selected.id }).then(({ data }) => {
       if (!cancelled) setBalance(data !== null ? Number(data) : null)
@@ -140,6 +144,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
     setAmount('')
     setMethod('cash')
     setMode('deposit')
+    setBalance(null)
     setQuery('')
   }
 
@@ -159,7 +164,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
           {success.offline ? 'Saved on this phone' : isDeposit ? 'Deposit recorded' : 'Withdrawal requested'}
         </p>
         <p style={{ color: 'var(--text)', fontSize: 17, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
-          GH₵ {Number(success.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+          {formatGHS(Number(success.amount))}
         </p>
         <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>{success.client}</p>
         {success.offline && (
@@ -245,7 +250,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
             {filtered.map((c, i) => (
               <button
                 key={c.id}
-                onClick={() => setSelected(c)}
+                onClick={() => { setSelected(c); setBalance(null) }}
                 className="pressable"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, width: '100%',
@@ -279,7 +284,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
         /* Step 2: amount + confirm */
         <div>
           <button
-            onClick={() => setSelected(null)}
+            onClick={() => { setSelected(null); setBalance(null) }}
             style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: 0, marginBottom: 16, fontFamily: 'inherit' }}
           >
             ← Change client
@@ -296,7 +301,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
               <button
                 key={m}
                 type="button"
-                onClick={() => setMode(m)}
+                onClick={() => { setMode(m); setBalance(null) }}
                 className="pressable"
                 style={{
                   flex: 1, padding: '12px 16px',
@@ -324,9 +329,7 @@ export default function CollectForm({ clients, bankerId, bankerName, isAdmin }: 
                   Available balance
                 </span>
                 <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>
-                  {balance === null
-                    ? '…'
-                    : `GH₵ ${balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`}
+                  {balance === null ? '…' : formatGHS(balance)}
                 </span>
               </div>
               <p style={{ color: 'var(--warning)', fontSize: 13, fontWeight: 500, marginTop: 8 }}>

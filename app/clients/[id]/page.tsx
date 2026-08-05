@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase-server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowDownCircle, ArrowUpCircle, Clock, Wifi, Phone, MapPin } from 'lucide-react'
+import { formatGHS } from '@/lib/format'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
@@ -15,9 +16,6 @@ type Txn = {
   created_at: string
   bankers: { full_name: string } | null
 }
-
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 const formatDateTime = (d: string) => {
   const dt = new Date(d)
@@ -49,11 +47,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const balance = client.accounts?.[0]?.balance ?? 0
 
   // Running balance: walk the ledger oldest-first, then show newest-first
-  let running = 0
-  const timeline = ((txns as unknown as Txn[]) ?? []).map(t => {
-    running += t.type === 'withdrawal' ? -Number(t.amount) : Number(t.amount)
-    return { ...t, balanceAfter: running }
-  }).reverse()
+  const timeline = ((txns as unknown as Txn[]) ?? [])
+    .reduce<Array<Txn & { balanceAfter: number }>>((acc, t) => {
+      const prev = acc.length > 0 ? acc[acc.length - 1].balanceAfter : 0
+      const delta = t.type === 'withdrawal' ? -Number(t.amount) : Number(t.amount)
+      acc.push({ ...t, balanceAfter: prev + delta })
+      return acc
+    }, [])
+    .reverse()
 
   return (
     <div>

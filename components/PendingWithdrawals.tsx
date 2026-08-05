@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import { ArrowUpCircle } from 'lucide-react'
+import { formatGHS } from '@/lib/format'
 
 const supabase = createClient()
 
@@ -15,9 +16,6 @@ export type WithdrawalRequest = {
   clients: { full_name: string; account_number: string | null } | null
   bankers: { full_name: string } | null
 }
-
-const formatGHS = (n: number) =>
-  `GH₵ ${Number(n).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 // Admin-only panel: approve moves money (atomically, balance-checked
 // in the database); reject closes the request. Both are audited.

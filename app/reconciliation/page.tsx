@@ -1,11 +1,9 @@
 import { createClient } from '@/lib/supabase-server'
 import ReconToolbar from '@/components/ReconToolbar'
+import { formatGHS, accraDateString } from '@/lib/format'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
-
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 type Row = {
   amount: number
@@ -33,7 +31,7 @@ export default async function ReconciliationPage({
   searchParams: Promise<{ date?: string }>
 }) {
   const { date } = await searchParams
-  const day = date ?? new Date().toISOString().slice(0, 10)
+  const day = date ?? accraDateString() // the union's "today", not the server's
 
   const supabase = await createClient()
   const { data: txns, error } = await supabase

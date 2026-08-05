@@ -2,12 +2,11 @@ import { createClient } from '@/lib/supabase-server'
 import type { Transaction } from '@/lib/supabase'
 import LogDepositButton from '@/components/LogDepositButton'
 import TransactionFilters from '@/components/TransactionFilters'
+import Pager from '@/components/Pager'
+import { formatGHS } from '@/lib/format'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
-
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
 
 const formatDateTime = (d: string) => {
   const dt = new Date(d)
@@ -15,19 +14,23 @@ const formatDateTime = (d: string) => {
     ' · ' + dt.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' })
 }
 
+const PAGE_SIZE = 50
+
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; method?: string; banker?: string; from?: string; to?: string }>
+  searchParams: Promise<{ type?: string; method?: string; banker?: string; from?: string; to?: string; page?: string }>
 }) {
-  const { type, method, banker, from, to } = await searchParams
+  const { type, method, banker, from, to, page: pageParam } = await searchParams
+  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const offset = (page - 1) * PAGE_SIZE
   const supabase = await createClient()
 
   let query = supabase
     .from('transactions')
-    .select('*, clients(full_name, account_number), bankers(full_name)')
+    .select('*, clients(full_name, account_number), bankers(full_name)', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + PAGE_SIZE) // one extra row → hasMore
 
   if (type === 'deposit' || type === 'withdrawal') query = query.eq('type', type)
   if (method === 'cash' || method === 'momo')      query = query.eq('method', method)
@@ -35,14 +38,17 @@ export default async function TransactionsPage({
   if (from) query = query.gte('created_at', `${from}T00:00:00`)
   if (to)   query = query.lte('created_at', `${to}T23:59:59.999`)
 
-  const [{ data: transactions, error }, { data: bankers }] = await Promise.all([
+  const [{ data: rows, error, count }, { data: bankers }] = await Promise.all([
     query,
     supabase.from('bankers').select('id, full_name').order('full_name'),
   ])
 
   if (error) return <p style={{ color: 'var(--danger)', padding: 20 }}>Error: {error.message}</p>
 
-  const totalDeposits = (transactions ?? [])
+  const hasMore = (rows ?? []).length > PAGE_SIZE
+  const transactions = (rows ?? []).slice(0, PAGE_SIZE)
+
+  const totalDeposits = transactions
     .filter(t => t.type === 'deposit')
     .reduce((s, t) => s + Number(t.amount), 0)
 
@@ -52,7 +58,7 @@ export default async function TransactionsPage({
         <div>
           <h1 style={{ color: 'var(--text)', fontWeight: 700, fontSize: 24 }}>Transactions</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>
-            {transactions?.length ?? 0} records · {formatGHS(totalDeposits)} deposited
+            {count ?? transactions.length} records · {formatGHS(totalDeposits)} deposited on this page
           </p>
         </div>
         {/* Desktop — mobile uses bottom nav */}
@@ -105,11 +111,11 @@ export default async function TransactionsPage({
               {/* Client + meta */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {(txn as any).clients?.full_name ?? '—'}
+                  {txn.clients?.full_name ?? '—'}
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                   {txn.type === 'opening' ? 'Opening balance' : txn.method === 'momo' ? 'MoMo' : 'Cash'}
-                  {(txn as any).bankers?.full_name ? ` · ${(txn as any).bankers.full_name}` : ''}
+                  {txn.bankers?.full_name ? ` · ${txn.bankers.full_name}` : ''}
                   {txn.notes ? ` · ${txn.notes}` : ''}
                 </p>
               </div>
@@ -132,6 +138,13 @@ export default async function TransactionsPage({
           ))
         )}
       </div>
+
+      <Pager
+        basePath="/transactions"
+        page={page}
+        hasMore={hasMore}
+        params={{ type, method, banker, from, to }}
+      />
     </div>
   )
 }

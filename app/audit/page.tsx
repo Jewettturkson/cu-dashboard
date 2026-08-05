@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
-import { ArrowDownCircle, ArrowUpCircle, UserPlus, UserCog, ShieldQuestion } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, UserPlus, UserCog, ShieldQuestion, Eye } from 'lucide-react'
+import Pager from '@/components/Pager'
+import { formatGHS } from '@/lib/format'
 
 // Live data — always fetch fresh, never serve a build-time snapshot
 export const dynamic = 'force-dynamic'
@@ -22,9 +24,6 @@ type AuditEntry = {
   created_at: string
 }
 
-const formatGHS = (n: number) =>
-  `GH₵ ${n.toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
-
 const formatDateTime = (d: string) => {
   const dt = new Date(d)
   return dt.toLocaleDateString('en-GH', { day: 'numeric', month: 'short' }) +
@@ -41,6 +40,8 @@ function describe(e: AuditEntry): string {
       return `paid out a withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'transaction.opening':
       return `recorded a migrated opening balance of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
+    case 'balance.viewed':
+      return `viewed the balance of ${d.client_name ?? 'a client'}`
     case 'withdrawal.requested':
       return `requested a ${d.method === 'momo' ? 'MoMo' : 'cash'} withdrawal of ${formatGHS(d.amount ?? 0)} for ${d.client_name ?? 'a client'}`
     case 'withdrawal.approved':
@@ -64,22 +65,35 @@ function iconFor(action: string) {
   if (action === 'transaction.deposit')    return { Icon: ArrowDownCircle, color: 'var(--success)' }
   if (action === 'transaction.withdrawal') return { Icon: ArrowUpCircle,   color: 'var(--danger)' }
   if (action === 'withdrawal.rejected')    return { Icon: ArrowUpCircle,   color: 'var(--text-muted)' }
+  if (action === 'balance.viewed')         return { Icon: Eye,             color: 'var(--text-muted)' }
   if (action.startsWith('withdrawal.'))    return { Icon: ArrowUpCircle,   color: 'var(--warning)' }
   if (action.startsWith('client.'))        return { Icon: UserPlus,        color: 'var(--accent)' }
   if (action.startsWith('banker.'))        return { Icon: UserCog,         color: 'var(--warning)' }
   return { Icon: ShieldQuestion, color: 'var(--text-muted)' }
 }
 
-export default async function AuditPage() {
+const PAGE_SIZE = 50
+
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const { page: pageParam } = await searchParams
+  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const offset = (page - 1) * PAGE_SIZE
   const supabase = await createClient()
 
-  const { data: entries, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('audit_log')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + PAGE_SIZE) // one extra row → hasMore
 
   if (error) return <p style={{ color: 'var(--danger)', padding: 20 }}>Error: {error.message}</p>
+
+  const hasMore = (rows ?? []).length > PAGE_SIZE
+  const entries = (rows ?? []).slice(0, PAGE_SIZE)
 
   return (
     <div>
@@ -144,10 +158,12 @@ export default async function AuditPage() {
 
         {(entries ?? []).length === 0 && (
           <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-            No activity recorded yet.
+            {page > 1 ? 'No more entries.' : 'No activity recorded yet.'}
           </div>
         )}
       </div>
+
+      <Pager basePath="/audit" page={page} hasMore={hasMore} params={{}} />
     </div>
   )
 }

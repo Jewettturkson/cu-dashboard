@@ -1,9 +1,33 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Eye, EyeOff } from 'lucide-react'
+
+// Rendered inside Suspense: useSearchParams is the idiomatic way to
+// read ?error=unprovisioned without effect-driven setState.
+function UnprovisionedNotice() {
+  const params = useSearchParams()
+  if (params.get('error') !== 'unprovisioned') return null
+  return (
+    <div
+      style={{
+        background: '#fff7ed',
+        border: '1px solid #fed7aa',
+        borderRadius: 8,
+        padding: '10px 14px',
+        color: 'var(--warning)',
+        fontSize: 13,
+        marginBottom: 16,
+      }}
+    >
+      Your login exists but your account isn&apos;t set up yet. Ask your
+      administrator to finish creating your profile.
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -81,6 +105,10 @@ export default function LoginPage() {
         <h2 style={{ color: 'var(--text)', fontWeight: 600, fontSize: 17, marginBottom: 24 }}>
           Sign in to your account
         </h2>
+
+        <Suspense fallback={null}>
+          <UnprovisionedNotice />
+        </Suspense>
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Email */}

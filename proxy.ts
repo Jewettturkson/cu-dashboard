@@ -2,8 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
+// Next 16 "proxy" convention (formerly middleware.ts).
+// Auth + role gate for every route: unauthenticated → /login,
+// unprovisioned (no profile row) → /login with message,
+// banker role → confined to /collect. RLS enforces data access
+// at the database; these redirects are UX, not security.
+export async function proxy(request: NextRequest) {
+  const response = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,21 +41,27 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user) {
-    // Role gate: bankers are confined to /collect. RLS enforces
-    // this at the database too — this redirect is UX, not security.
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    const role = profile?.role ?? 'admin' // no profile row yet → treat as admin (pre-migration)
+    // Deny by default: an auth user with no profile row is
+    // unprovisioned — send them to login with a clear message
+    // instead of guessing a role.
+    if (!profile) {
+      if (!isLoginPage) {
+        return NextResponse.redirect(new URL('/login?error=unprovisioned', request.url))
+      }
+      return response // let them see the login page + message
+    }
 
-    if (role === 'banker' && !isCollectPage) {
+    if (profile.role === 'banker' && !isCollectPage) {
       return NextResponse.redirect(new URL('/collect', request.url))
     }
 
-    // Already logged in → redirect away from login (banker case handled above)
+    // Already logged in → redirect away from login
     if (isLoginPage) {
       return NextResponse.redirect(new URL('/', request.url))
     }
@@ -60,6 +71,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Run middleware on all routes except static assets
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Run on all routes except static assets
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
