@@ -46,7 +46,16 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError('Wrong email or password. Please try again.')
+      // Distinguish "server unreachable" (e.g. paused database) from
+      // actual credential failures — telling someone their password is
+      // wrong when the database is asleep sends them down the wrong path.
+      setError(
+        /banned/i.test(error.message)
+          ? 'This account has been deactivated. Contact your administrator.'
+          : /fetch|network|failed to/i.test(error.message)
+            ? 'Can’t reach the server right now — the database may be paused or waking up. Try again in a minute.'
+            : 'Wrong email or password. Please try again.'
+      )
       setLoading(false)
     } else {
       router.push('/')
